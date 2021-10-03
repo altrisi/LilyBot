@@ -12,6 +12,7 @@ import net.dv8tion.jda.api.utils.ChunkingFilter;
 import net.dv8tion.jda.api.utils.MemberCachePolicy;
 import net.irisshaders.lilybot.commands.Ping;
 import net.irisshaders.lilybot.commands.custom.Custom;
+import net.irisshaders.lilybot.commands.custom.CustomCreator;
 import net.irisshaders.lilybot.commands.moderation.Shutdown;
 import net.irisshaders.lilybot.commands.moderation.*;
 import net.irisshaders.lilybot.database.SQLiteDataSource;
@@ -42,8 +43,9 @@ public class LilyBot {
     public final EventWaiter waiter;
     public final Properties config;
     public final Path configPath;
+    public final CommandClient commandClient;
 
-    public LilyBot(JDA jda, GitHub gitHub, EventWaiter waiter, Path configPath) {
+    public LilyBot(JDA jda, GitHub gitHub, EventWaiter waiter, Path configPath, CommandClient commandClient) {
         this.jda = jda;
         this.gitHub = gitHub;
         this.waiter = waiter;
@@ -55,6 +57,7 @@ public class LilyBot {
             LOG_LILY.error("Error loading lily config file at "+configPath, e);
         }
         this.config = properties;
+        this.commandClient = commandClient;
     }
 
     public static void main(String[] args) {
@@ -83,16 +86,18 @@ public class LilyBot {
         }
 
         EventWaiter waiter = new EventWaiter();
-        CommandClient builder = new CommandClientBuilder()
+        CommandClientBuilder builder = new CommandClientBuilder()
                 .setPrefix("!")
                 .setHelpConsumer(null)
                 .setStatus(OnlineStatus.ONLINE)
                 .setActivity(Activity.playing("Iris 1.17.1"))
                 .setOwnerId(Constants.OWNER)
-                .forceGuildOnly(Constants.GUILD_ID)
-                .build();
+                .forceGuildOnly(Constants.GUILD_ID);
 
-        jda.addEventListener(builder, waiter);
+        addBuiltinCommands(builder);
+        addCustomCommands(builder);
+        CommandClient commandClient = builder.build();
+        jda.addEventListener(commandClient, waiter);
 
         jda.addEventListener(new ReadyHandler());
         // jda.addEventListener(new Report()); // TODO uncomment when threads are finished
@@ -113,13 +118,11 @@ public class LilyBot {
             jda.shutdownNow();
         }
 
-        INSTANCE = new LilyBot(jda, github, waiter, Paths.get(Constants.CONFIG_PATH));
+        INSTANCE = new LilyBot(jda, github, waiter, Paths.get(Constants.CONFIG_PATH), commandClient);
 
-        INSTANCE.addBuiltinCommands(builder);
-        INSTANCE.addCustomCommands(builder);
     }
 
-    public void addBuiltinCommands(CommandClient commands) {
+    public static void addBuiltinCommands(CommandClientBuilder commands) {
         // add commands now
         commands.addSlashCommand(new Ping());
 
@@ -140,13 +143,22 @@ public class LilyBot {
 
         // Shutdown Command
         commands.addSlashCommand(new Shutdown());
+        
+        commands.addSlashCommand(new CustomCreator());
+        
     }
 
-    public void addCustomCommands(CommandClient commands) {
-        var cmdNames = this.config.getProperty("commands").split(" ");
+    public static void addCustomCommands(CommandClientBuilder commands) {
+    	Properties props = new Properties();
+    	try {
+			props.load(Files.newInputStream(Path.of("lily.properties")));
+		} catch (IOException e) {
+			throw null;
+		}
+        var cmdNames = props.getProperty("commands").split(" ");
         for (var cmd : cmdNames) {
             LOG_LILY.info("Adding custom command '{}'", cmd);
-            commands.addSlashCommand(Custom.parse(cmd, this.config));
+            commands.addSlashCommand(Custom.parse(cmd, props));
         }
     }
 
