@@ -25,11 +25,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.security.auth.login.LoginException;
+
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 @SuppressWarnings("UnusedAssignment")
@@ -147,9 +152,35 @@ public class LilyBot {
 
     public void addCustomCommands(SlashCommandHandler handler) {
         var cmdNames = this.config.getProperty("commands").split(" ");
+        List<Custom> commands = new ArrayList<>();
         for (var cmd : cmdNames) {
             LOG_LILY.info("Adding custom command '{}'", cmd);
-            handler.addSlashCommand(Custom.parse(cmd, this.config));
+            Custom command = Custom.parse(cmd, this.config);
+            commands.add(command);
+            handler.addSlashCommand(command);
+        }
+        Path out = Paths.get("lily.toml");
+        try {
+        	Files.createFile(out);
+        	try (BufferedWriter writer = Files.newBufferedWriter(out)) {
+        		writer.append("# An included configuration file for Lily, used for the instance running in the Iris Discord server.");
+        		writer.newLine();
+        		writer.newLine();
+        		writer.append("# Specify the path to this file in the CONFIG_FILE field of your .env file if you would like to use it.");
+        		writer.newLine();
+        		writer.newLine();
+        		writer.append("activity = \"Iris\"");
+        		writer.newLine();
+        		writer.newLine();
+        		for (Custom command : commands) {
+        			writer.append("[[command]]");
+        			writer.newLine();
+        			command.exportToToml(writer);
+        			writer.newLine();
+        		}
+            }
+        } catch (IOException e) {
+        	throw new UncheckedIOException(e);
         }
     }
 
