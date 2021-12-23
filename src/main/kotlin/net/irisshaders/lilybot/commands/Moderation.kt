@@ -67,16 +67,9 @@ class Moderation : Extension() {
                     content = "Messages Cleared"
                 }
 
-                actionLog.createEmbed {
-                    color = DISCORD_BLACK
-                    title = "$messageAmount messages have been cleared."
+                actionLog.createMessage("$messageAmount messages have been cleared.", user, DISCORD_BLACK, {
                     description = "Action occurred in ${textChannel.mention}."
-                    timestamp = Clock.System.now()
-                    footer {
-                        text = "Requested by " + user.asUser().tag
-                        icon = user.asUser().avatar?.url
-                    }
-                }
+                })
             }
         }
 
